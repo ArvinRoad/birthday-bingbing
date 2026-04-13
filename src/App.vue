@@ -1,29 +1,43 @@
 <template>
-  <!-- 路由出口：所有页面渲染在这里 -->
+  <audio ref="audioRef" loop autoplay muted src="https://music.163.com/song/media/outer/url?id=1868535933.mp3"></audio>
   <router-view></router-view>
 </template>
 
 <script setup>
-// 根组件仅作为路由容器
+import { ref, onMounted, provide } from 'vue'
+
+const audioRef = ref(null)
+
+const playGlobalAudio = () => {
+  audioRef.value.muted = false
+  audioRef.value?.play().catch(err => console.log('音频播放：', err))
+}
+
+onMounted(() => {
+  playGlobalAudio()
+  document.addEventListener('click', playGlobalAudio, { once: true })
+})
+
+provide('playGlobalAudio', playGlobalAudio)
 </script>
 
 <style>
-/* 全局基础样式（手机端优先） */
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
-  -webkit-tap-highlight-color: transparent; /* 去除手机点击高亮 */
+  -webkit-tap-highlight-color: transparent;
 }
 html, body {
   width: 100%;
   height: 100%;
   overflow-x: hidden;
-  scroll-behavior: smooth;
-  background: #000;
-  touch-action: pan-y; /* 禁止缩放，仅允许垂直滚动 */
-  -webkit-text-size-adjust: 100%;
-  text-size-adjust: 100%;
+  background: linear-gradient(135deg, 
+    #0a0806 0%, 
+    #1a150f 25%, 
+    #0f0b07 50%, 
+    #050402 75%, 
+    #000000 100%);
 }
 #app {
   width: 100%;

@@ -1,9 +1,9 @@
 <template>
   <div class="page">
-    <audio ref="audioRef" loop src="https://music.163.com/song/media/outer/url?id=1868535933.mp3"></audio>
-
+    <!-- 流星雨画布：最底层 -->
+    <canvas ref="meteorCanvas" class="meteor-canvas"></canvas>
+    
     <section class="poster">
-      <div class="overlay"></div>
       <div class="content">
         <h1>刘冰冰</h1>
         <div class="divider"></div>
@@ -25,248 +25,480 @@
     </section>
 
     <section class="end">
-      <button class="btn" @click="handleLuckBtn">✨ 点击领取小幸运</button>
-      <div v-show="show" class="modal">
-        <h2>遇见你，是我最珍贵的摩拉</h2>
-        <p>生日快乐，刘冰冰</p>
-      </div>
-      <button class="btn" style="margin-top: 20px;" @click="goToStar">✨ 打开星光祝福</button>
+      <button class="btn" @click="goToStar">✨ 打开星光祝福</button>
     </section>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted, onUnmounted, inject, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 
-// 音频播放（适配手机端）
-const audioRef = ref(null)
-const playAudio = () => {
-  audioRef.value?.play().catch(err => console.log('音频需点击触发：', err))
-}
-
-// 彩蛋弹窗
-const show = ref(false)
-const handleLuckBtn = () => {
-  show.value = true
-  playAudio() // 点击按钮时播放音频
-}
+// 注入全局音频播放方法
+const playGlobalAudio = inject('playGlobalAudio')
 
 // 路由跳转
 const router = useRouter()
 const goToStar = () => {
-  playAudio() // 跳转时确保音频播放
+  playGlobalAudio()
   router.push('/star')
 }
+
+// ---------------------- 左上→右下线性流星 ----------------------
+const meteorCanvas = ref(null)
+let meteorCtx = null
+let meteorAnimationId = null
+let meteors = []
+let stars = []
+
+// 安全的数值校验函数
+const isValidNumber = (num) => {
+  return !isNaN(num) && isFinite(num) && num >= 0
+}
+
+// 柔和紫金色值
+const COLORS = {
+  purple: { r: 145, g: 80, b: 170 },    // 柔和深紫
+  gold: { r: 200, g: 180, b: 80 },      // 柔和金色
+  lightPurple: { r: 210, g: 200, b: 220 }, // 极浅紫
+  lightGold: { r: 230, g: 220, b: 200 }    // 极浅金
+}
+
+// 左上→右下流星配置
+const METEOR_CONFIG = {
+  meteorCount: 5,  // 少量流星，不遮挡
+  starCount: 100,
+  meteorMinSpeed: 1.2, // 线性速度
+  meteorMaxSpeed: 2.5,
+  meteorMinLength: 60,
+  meteorMaxLength: 150,
+  meteorMinWidth: 0.5, // 细线条
+  meteorMaxWidth: 1.2,
+  trailMinLength: 5,   
+  trailMaxLength: 8
+}
+
+// 静态星光点
+class Star {
+  constructor(canvasWidth, canvasHeight) {
+    this.reset(canvasWidth, canvasHeight)
+  }
+
+  reset(canvasWidth, canvasHeight) {
+    this.x = isValidNumber(canvasWidth) ? Math.random() * canvasWidth : 0
+    this.y = isValidNumber(canvasHeight) ? Math.random() * canvasHeight : 0
+    this.size = Math.random() * 0.8 + 0.1
+    this.opacity = Math.random() * 0.4 + 0.1
+    this.blinkSpeed = Math.random() * 0.002 + 0.0003
+    this.colorRatio = Math.random()
+  }
+
+  update() {
+    this.opacity += this.blinkSpeed
+    if (this.opacity > 0.5) this.opacity = 0.5
+    if (this.opacity < 0.1) this.opacity = 0.1
+    if (this.opacity >= 0.5 || this.opacity <= 0.1) {
+      this.blinkSpeed *= -1
+    }
+  }
+
+  draw(ctx) {
+    if (!isValidNumber(this.x) || !isValidNumber(this.y) || !isValidNumber(this.size)) return
+    
+    const r = Math.round(COLORS.lightPurple.r * (1-this.colorRatio) + COLORS.lightGold.r * this.colorRatio)
+    const g = Math.round(COLORS.lightPurple.g * (1-this.colorRatio) + COLORS.lightGold.g * this.colorRatio)
+    const b = Math.round(COLORS.lightPurple.b * (1-this.colorRatio) + COLORS.lightGold.b * this.colorRatio)
+    
+    ctx.beginPath()
+    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2)
+    ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${this.opacity})`
+    ctx.fill()
+  }
+}
+
+// 流星类：左上→右下线性滑落
+class Meteor {
+  constructor(canvasWidth, canvasHeight) {
+    this.reset(canvasWidth, canvasHeight)
+  }
+
+  reset(canvasWidth, canvasHeight) {
+    const cw = isValidNumber(canvasWidth) ? canvasWidth : window.innerWidth
+    const ch = isValidNumber(canvasHeight) ? canvasHeight : window.innerHeight
+    
+    // 初始位置：左上区域（屏幕内/外）
+    this.x = Math.random() * cw * 0.5 // 0 - 屏幕宽度50%（左上）
+    this.y = Math.random() * ch * 0.3 // 0 - 屏幕高度30%（左上）
+    
+    // 核心修改：左上→右下的线性速度（x正方向，y正方向）
+    const baseSpeed = Math.random() * (METEOR_CONFIG.meteorMaxSpeed - METEOR_CONFIG.meteorMinSpeed) + METEOR_CONFIG.meteorMinSpeed
+    this.speedX = baseSpeed * 0.8 // 向右速度
+    this.speedY = baseSpeed * 0.6 // 向下速度（略慢于向右，形成自然的斜线）
+    
+    // 流星尺寸
+    this.length = Math.max(METEOR_CONFIG.meteorMinLength, Math.random() * (METEOR_CONFIG.meteorMaxLength - METEOR_CONFIG.meteorMinLength) + METEOR_CONFIG.meteorMinLength)
+    this.width = Math.max(METEOR_CONFIG.meteorMinWidth, Math.random() * (METEOR_CONFIG.meteorMaxWidth - METEOR_CONFIG.meteorMinWidth) + METEOR_CONFIG.meteorMinWidth)
+    
+    this.opacity = Math.random() * 0.6 + 0.2
+    this.decay = Math.random() * 0.001 + 0.0003
+    this.trailLength = Math.round(Math.random() * (METEOR_CONFIG.trailMaxLength - METEOR_CONFIG.trailMinLength) + METEOR_CONFIG.trailMinLength)
+  }
+
+  update(canvasWidth, canvasHeight) {
+    const cw = isValidNumber(canvasWidth) ? canvasWidth : window.innerWidth
+    const ch = isValidNumber(canvasHeight) ? canvasHeight : window.innerHeight
+
+    // 左上→右下线性移动
+    if (isValidNumber(this.x) && isValidNumber(this.speedX)) {
+      this.x += this.speedX // 向右移动
+    }
+    if (isValidNumber(this.y) && isValidNumber(this.speedY)) {
+      this.y += this.speedY // 向下移动
+    }
+    this.opacity = Math.max(0, this.opacity - this.decay)
+
+    // 重置条件：移出右下屏幕
+    if (this.x > cw + this.length || this.y > ch + this.length || this.opacity <= 0) {
+      this.reset(cw, ch)
+    }
+  }
+
+  draw(ctx) {
+    if (!isValidNumber(this.x) || !isValidNumber(this.y) || !isValidNumber(this.length) || this.opacity <= 0) {
+      return
+    }
+
+    ctx.save()
+    // 线性渐变：流星头部（左上）→ 尾部（右下）
+    const gradX = this.x + this.length * 0.7 // 右下方向的渐变终点
+    const gradY = this.y + this.length * 0.5 // 右下方向的渐变终点
+    
+    if (!isValidNumber(gradX) || !isValidNumber(gradY)) {
+      ctx.restore()
+      return
+    }
+
+    // 柔和的线性渐变（头部亮，尾部暗）
+    const gradient = ctx.createLinearGradient(this.x, this.y, gradX, gradY)
+    gradient.addColorStop(0, `rgba(${COLORS.gold.r}, ${COLORS.gold.g}, ${COLORS.gold.b}, ${this.opacity})`) // 头部金色
+    gradient.addColorStop(1, `rgba(${COLORS.purple.r}, ${COLORS.purple.g}, ${COLORS.purple.b}, ${this.opacity * 0.3})`) // 尾部紫色
+    
+    // 绘制线性流星线条
+    ctx.beginPath()
+    ctx.strokeStyle = gradient
+    ctx.lineWidth = this.width
+    ctx.lineCap = 'round' // 圆形端点，避免长条形
+    ctx.moveTo(this.x, this.y) // 起点（左上）
+    ctx.lineTo(gradX, gradY) // 终点（右下）
+    ctx.stroke()
+
+    // 线性拖尾（右下方向）
+    for (let i = 1; i < this.trailLength; i++) {
+      const trailOpacity = this.opacity * (1 - i/this.trailLength) * 0.5
+      if (trailOpacity <= 0.1) continue
+      
+      const trailX = this.x + (gradX - this.x) * (i/this.trailLength)
+      const trailY = this.y + (gradY - this.y) * (i/this.trailLength)
+      const trailSize = this.width * (1 - i/this.trailLength) * 0.6
+      
+      if (!isValidNumber(trailX) || !isValidNumber(trailY) || !isValidNumber(trailSize)) continue
+      
+      ctx.beginPath()
+      ctx.arc(trailX, trailY, trailSize, 0, Math.PI * 2)
+      ctx.fillStyle = `rgba(${COLORS.gold.r}, ${COLORS.gold.g}, ${COLORS.gold.b}, ${trailOpacity})`
+      ctx.fill()
+    }
+    ctx.restore()
+  }
+}
+
+// 初始化
+const initMeteorCanvas = async () => {
+  await nextTick()
+  
+  if (!meteorCanvas.value) {
+    console.error('Canvas元素未找到')
+    return
+  }
+  
+  try {
+    // 清除旧动画
+    if (meteorAnimationId) {
+      cancelAnimationFrame(meteorAnimationId)
+      meteorAnimationId = null
+    }
+    
+    meteorCtx = meteorCanvas.value.getContext('2d')
+    if (!meteorCtx) {
+      console.error('无法获取Canvas 2D上下文')
+      return
+    }
+    
+    // 设置画布尺寸
+    const w = window.innerWidth || 375
+    const h = window.innerHeight || 667
+    meteorCanvas.value.width = w
+    meteorCanvas.value.height = h
+    console.log('画布尺寸设置完成:', w, h)
+    
+    // 初始化粒子
+    stars = []
+    meteors = []
+    initStars()
+    initMeteors()
+    console.log('流星数量:', meteors.length, '星光数量:', stars.length)
+    
+    // 启动动画
+    animateMeteors()
+  } catch (e) {
+    console.error('流星雨初始化失败:', e)
+  }
+}
+
+const initStars = () => {
+  const { width, height } = meteorCanvas.value || { width: window.innerWidth, height: window.innerHeight }
+  for (let i = 0; i < METEOR_CONFIG.starCount; i++) {
+    stars.push(new Star(width, height))
+  }
+}
+
+const initMeteors = () => {
+  const { width, height } = meteorCanvas.value || { width: window.innerWidth, height: window.innerHeight }
+  for (let i = 0; i < METEOR_CONFIG.meteorCount; i++) {
+    meteors.push(new Meteor(width, height))
+  }
+}
+
+// 动画渲染
+const animateMeteors = () => {
+  if (!meteorCtx) return
+  
+  try {
+    const { width, height } = meteorCanvas.value
+    // 柔和清屏
+    meteorCtx.fillStyle = 'rgba(0, 0, 0, 0.03)'
+    meteorCtx.fillRect(0, 0, width, height)
+    
+    // 渲染星光
+    stars.forEach(star => {
+      star.update()
+      star.draw(meteorCtx)
+    })
+
+    // 渲染流星
+    meteors.forEach(meteor => {
+      meteor.update(width, height)
+      meteor.draw(meteorCtx)
+    })
+
+    meteorAnimationId = requestAnimationFrame(animateMeteors)
+  } catch (e) {
+    console.error('动画渲染错误:', e)
+    setTimeout(() => {
+      if (meteorAnimationId) cancelAnimationFrame(meteorAnimationId)
+      animateMeteors()
+    }, 100)
+  }
+}
+
+// 生命周期
+onMounted(() => {
+  setTimeout(() => {
+    initMeteorCanvas()
+  }, 300)
+  
+  window.addEventListener('resize', () => {
+    if (meteorAnimationId) cancelAnimationFrame(meteorAnimationId)
+    setTimeout(initMeteorCanvas, 100)
+  })
+})
+
+onUnmounted(() => {
+  if (meteorAnimationId) cancelAnimationFrame(meteorAnimationId)
+  window.removeEventListener('resize', initMeteorCanvas)
+})
 </script>
 
 <style scoped>
 .page {
-  width: 100%;
+  width: 100vw;
   min-height: 100vh;
   font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
   color: #fff;
-  background: #000;
+  position: relative;
+  overflow-x: hidden;
+  background: #0a0812;
 }
 
+/* 画布样式：最底层，无滤镜，低透明度 */
+.meteor-canvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 0;
+  pointer-events: none;
+  filter: none;
+  opacity: 0.9;
+}
+
+/* 主海报区域 */
 .poster {
-  width: 100%;
+  width: 100vw;
   height: 100vh;
   position: relative;
   background: url('/birthday-bingbing/images/QunXiang.png') center/cover no-repeat;
+  background-attachment: fixed;
   display: flex;
   align-items: center;
   justify-content: center;
   text-align: center;
-}
-
-.overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(
-    180deg,
-    rgba(0, 0, 0, 0.25) 0%,
-    rgba(10, 8, 6, 0.55) 50%,
-    rgba(0, 0, 0, 0.9) 100%
-  );
+  box-shadow: inset 0 0 10vw rgba(0, 0, 0, 0.1);
   z-index: 1;
 }
 
+/* 文字内容：增强对比度 */
 .content {
   position: relative;
   z-index: 2;
-  padding: 0 20px;
+  padding: 0 5vw;
+  text-shadow: 0 0 0.8vw #000,
+               0 0 1.5vw rgba(212, 175, 55, 0.9),
+               0 0 3vw rgba(156, 39, 176, 0.7);
 }
 
 .poster h1 {
-  font-size: 64px;
+  font-size: 10vw;
   font-weight: 800;
-  color: #f0e6d2;
-  text-shadow: 0 0 20px rgba(212, 175, 55, 0.6);
-  margin-bottom: 20px;
+  color: #f8f5e6;
+  margin-bottom: 2vh;
+  text-stroke: 0.5px #d4af37;
+  -webkit-text-stroke: 0.5px #d4af37;
 }
 
 .divider {
-  width: 300px;
-  height: 2px;
-  background: linear-gradient(90deg, transparent, #d4af37, transparent);
-  margin: 0 auto 15px;
+  width: 60vw;
+  height: 0.3vh;
+  background: linear-gradient(90deg, 
+    transparent, 
+    #9c27b0, 
+    #d4af37, 
+    #9c27b0, 
+    transparent);
+  margin: 0 auto 1.5vh;
+  box-shadow: 0 0 1.2vw rgba(156, 39, 176, 0.7);
 }
 
 .date {
-  font-size: 20px;
-  color: #d4af37;
-  margin-bottom: 10px;
-  letter-spacing: 2px;
+  font-size: 3.5vw;
+  color: #f0e6d2;
+  margin-bottom: 1vh;
+  letter-spacing: 0.2vw;
+  font-weight: 500;
 }
 
 .slogan {
-  font-size: 18px;
-  color: #f0e6d2;
-  opacity: 0.9;
+  font-size: 3vw;
+  color: #f8f5e6;
+  opacity: 0.95;
+  font-weight: 500;
 }
 
+/* 留言区域 */
 .message {
-  width: 100%;
-  padding: 100px 20px;
-  background: linear-gradient(180deg, #000 0%, #0c0a09 50%, #000 100%);
+  width: 100vw;
+  padding: 10vh 5vw;
   display: flex;
   justify-content: center;
+  position: relative;
+  z-index: 1;
+  background: linear-gradient(180deg, 
+    rgba(10, 8, 18, 0.7) 0%, 
+    rgba(156, 39, 176, 0.05) 50%, 
+    rgba(10, 8, 18, 0.7) 100%);
 }
 
 .card {
   width: 100%;
-  max-width: 450px;
+  max-width: 90vw;
   text-align: center;
+  border: 1px solid rgba(156, 39, 176, 0.4);
+  border-radius: 2vw;
+  padding: 5vw;
+  background: rgba(0, 0, 0, 0.6);
+  box-shadow: 0 0 3vw rgba(156, 39, 176, 0.3);
+  position: relative;
+  z-index: 2;
 }
 
 .text {
   line-height: 2.2;
-  font-size: 17px;
-  color: #f0e6d2;
-  padding: 0 10px;
+  font-size: 3.2vw;
+  color: #f8f5e6;
+  padding: 0 2vw;
+  text-shadow: 0 0 1vw #000,
+               0 0 1.5vw rgba(156, 39, 176, 0.8);
+  font-weight: 500;
 }
 
 .sign {
-  margin-top: 25px;
-  opacity: 0.7;
+  margin-top: 3vh;
+  opacity: 0.95;
   text-align: right;
-  font-size: 15px;
-  color: #d4af37;
-}
-
-.end {
-  width: 100%;
-  padding: 100px 20px;
-  background: #000;
-  text-align: center;
-}
-
-.btn {
-  padding: 16px 36px;
-  background: linear-gradient(180deg, #d4af37 0%, #b8860b 100%);
-  color: #000;
-  border: none;
-  border-radius: 12px;
-  font-size: 17px;
-  font-weight: bold;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 15px rgba(212, 175, 55, 0.4);
-  width: 80%;
-  max-width: 320px;
-}
-
-.btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(212, 175, 55, 0.5);
-}
-
-.modal {
-  margin-top: 35px;
-  animation: fade 0.6s forwards;
-}
-
-.modal h2 {
-  color: #d4af37;
-  font-size: 24px;
-  margin-bottom: 12px;
-  text-shadow: 0 2px 10px rgba(212, 175, 55, 0.4);
-}
-
-.modal p {
-  font-size: 17px;
+  font-size: 2.8vw;
   color: #f0e6d2;
 }
 
-@keyframes fade {
-  from { 
-    opacity: 0; 
-    transform: translateY(20px); 
-  }
-  to { 
-    opacity: 1; 
-    transform: translateY(0); 
-  }
+/* 按钮区域 */
+.end {
+  width: 100vw;
+  padding: 10vh 5vw;
+  text-align: center;
+  position: relative;
+  z-index: 1;
 }
 
-/* 手机端适配（核心） */
-@media (max-width: 768px) {
-  .poster {
-    height: 100vh;
-    background-position: center 30%;
-  }
-  .poster h1 {
-    font-size: 42px;
-    margin-bottom: 15px;
-  }
-  .divider {
-    width: 200px;
-  }
-  .date {
-    font-size: 16px;
-    letter-spacing: 1px;
-  }
-  .slogan {
-    font-size: 15px;
-  }
-  .message {
-    padding: 60px 15px;
-  }
-  .text {
-    font-size: 15px;
-    line-height: 2;
-    padding: 0 5px;
-  }
-  .end {
-    padding: 60px 15px;
-  }
-  .btn {
-    padding: 14px 28px;
-    font-size: 16px;
-    width: 80%;
-    max-width: 300px;
-  }
-  .modal h2 {
-    font-size: 22px;
-  }
-  .modal p {
-    font-size: 16px;
-  }
+.btn {
+  padding: 2.5vh 5vw;
+  background: linear-gradient(180deg, 
+    #d4af37 0%, 
+    #9c27b0 50%, 
+    #8b6906 100%);
+  color: #fff;
+  border: none;
+  border-radius: 2vw;
+  font-size: 3.2vw;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 1vw 4vw rgba(156, 39, 176, 0.7),
+              inset 0 0 1vw rgba(255, 255, 255, 0.4);
+  width: 80vw;
+  max-width: 90vw;
+  position: relative;
+  z-index: 2;
+  border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
-/* 超小屏手机（iPhone SE/小屏安卓） */
+.btn:hover {
+  transform: translateY(-0.5vh);
+  box-shadow: 0 1.5vw 5vw rgba(156, 39, 176, 0.9),
+              inset 0 0 1.5vw rgba(255, 255, 255, 0.5);
+}
+
+/* 小屏适配 */
 @media (max-width: 375px) {
   .poster h1 {
-    font-size: 36px;
+    font-size: 9vw;
+    -webkit-text-stroke: 0.3px #d4af37;
   }
   .btn {
-    width: 90%;
-    padding: 12px 24px;
-    font-size: 15px;
+    padding: 2vh 4vw;
+    font-size: 3vw;
+  }
+  .card {
+    padding: 4vw;
   }
 }
 </style>

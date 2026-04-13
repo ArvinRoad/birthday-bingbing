@@ -1,7 +1,7 @@
 <template>
   <div class="star-page">
-    <audio ref="audioRef" loop src="https://music.163.com/song/media/outer/url?id=1868535933.mp3" />
-    
+    <div class="global-gradient"></div>
+
     <canvas ref="starCanvas" id="starCanvas"></canvas>
 
     <div class="birthday-box">
@@ -18,31 +18,24 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, onMounted, onUnmounted, inject } from 'vue';
 import { useRouter } from 'vue-router';
 
-// 音频播放（适配手机端）
-const audioRef = ref(null)
-const playAudio = () => {
-  audioRef.value?.play().catch(err => console.log('音频需点击触发：', err))
-}
+const playGlobalAudio = inject('playGlobalAudio')
 
-// 路由返回
 const router = useRouter();
 const goBack = () => {
-  playAudio()
+  playGlobalAudio()
   router.push('/');
 };
 
-// 星光粒子（手机端性能优化版）
 const starCanvas = ref(null);
 let ctx = null;
 let particles = [];
 let animationId = null;
 
-// 手机端优化配置
 const CONFIG = {
-  particleCount: 120, // 减少粒子数量，避免卡顿
+  particleCount: 120,
   minSize: 0.8,
   maxSize: 3,
   minSpeed: 0.02,
@@ -115,7 +108,7 @@ const animate = () => {
 };
 
 onMounted(() => {
-  playAudio() // 挂载时尝试播放（需用户先点击）
+  playGlobalAudio()
   initCanvas();
   window.addEventListener('resize', resizeCanvas);
   window.addEventListener('resize', initParticles);
@@ -133,23 +126,40 @@ onUnmounted(() => {
   width: 100vw;
   height: 100vh;
   overflow: hidden;
-  background: #000;
+  position: relative;
+}
+
+/* 全局黑金渐变叠加层 */
+.global-gradient {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: linear-gradient(
+    to bottom,
+    rgba(212, 175, 55, 0.05) 0%,
+    rgba(184, 134, 11, 0.1) 50%,
+    rgba(100, 75, 5, 0.05) 100%
+  );
+  z-index: 1;
+  pointer-events: none;
 }
 
 #starCanvas {
   position: fixed;
   top: 0;
   left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 1;
+  width: 100vw;
+  height: 100vh;
+  z-index: 0;
 }
 
 .birthday-box {
   position: relative;
   z-index: 2;
   text-align: center;
-  padding: 50px 20px;
+  padding: 8vh 5vw;
   color: #fff;
   font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
   height: 100vh;
@@ -160,83 +170,63 @@ onUnmounted(() => {
 }
 
 .birthday-title {
-  font-size: 48px;
-  margin-bottom: 20px;
+  font-size: 7vw;
+  margin-bottom: 3vh;
   color: #d4af37;
-  text-shadow: 0 0 10px rgba(212, 175, 55, 0.7);
+  text-shadow: 0 0 2vw rgba(212, 175, 55, 0.7);
 }
 
 .birthday-wish {
-  font-size: 24px;
-  margin-bottom: 30px;
+  font-size: 3.5vw;
+  margin-bottom: 4vh;
   line-height: 1.8;
   color: #f0e6d2;
-  padding: 0 10px;
+  padding: 0 3vw;
+  text-shadow: 0 0 0.5vw rgba(212, 175, 55, 0.5);
 }
 
 .birthday-img {
-  width: 80%;
-  max-width: 600px;
-  border-radius: 20px;
-  box-shadow: 0 0 20px rgba(212, 175, 55, 0.5);
-  margin-bottom: 20px;
+  width: 80vw;
+  max-width: 90vw;
+  border-radius: 3vw;
+  box-shadow: 0 0 3vw rgba(212, 175, 55, 0.5),
+              0 0 5vw rgba(0, 0, 0, 0.7);
+  margin-bottom: 3vh;
+  border: 1px solid rgba(212, 175, 55, 0.3);
 }
 
 .back-btn {
-  margin-top: 40px;
-  padding: 16px 36px;
-  background: linear-gradient(180deg, #d4af37 0%, #b8860b 100%);
+  margin-top: 5vh;
+  padding: 2.5vh 5vw;
+  background: linear-gradient(180deg, 
+    #d4af37 0%, 
+    #b8860b 50%, 
+    #8b6906 100%);
   color: #000;
-  font-size: 17px;
+  font-size: 3.2vw;
   font-weight: bold;
   border: none;
-  border-radius: 12px;
+  border-radius: 2vw;
   cursor: pointer;
   transition: all 0.3s ease;
-  box-shadow: 0 4px 15px rgba(212, 175, 55, 0.4);
-  width: 80%;
-  max-width: 300px;
+  box-shadow: 0 1vw 3vw rgba(212, 175, 55, 0.4),
+              inset 0 0 1vw rgba(255, 255, 255, 0.2);
+  width: 80vw;
+  max-width: 90vw;
 }
 
 .back-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(212, 175, 55, 0.5);
+  transform: translateY(-0.5vh);
+  box-shadow: 0 1.5vw 4vw rgba(212, 175, 55, 0.5),
+              inset 0 0 1.5vw rgba(255, 255, 255, 0.3);
 }
 
-/* 手机端适配 */
-@media (max-width: 768px) {
-  .birthday-title {
-    font-size: 32px;
-    margin-bottom: 15px;
-  }
-  .birthday-wish {
-    font-size: 18px;
-    line-height: 1.6;
-  }
-  .birthday-img {
-    width: 90%;
-    border-radius: 15px;
-  }
-  .back-btn {
-    padding: 14px 28px;
-    font-size: 15px;
-    width: 80%;
-    max-width: 280px;
-    margin-top: 30px;
-  }
-}
-
-/* 超小屏适配 */
 @media (max-width: 375px) {
   .birthday-title {
-    font-size: 28px;
+    font-size: 6vw;
   }
   .birthday-wish {
-    font-size: 16px;
-  }
-  .back-btn {
-    width: 90%;
-    padding: 12px 24px;
+    font-size: 3vw;
   }
 }
 </style>
