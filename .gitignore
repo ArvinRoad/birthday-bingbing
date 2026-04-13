@@ -1,25 +1,19 @@
-# 忽略 node_modules 文件夹（核心！）
+# 依赖
 node_modules/
-
-# 忽略 vite 打包后的文件夹
+# 打包文件
 dist/
-
-# 忽略系统缓存文件
-.DS_Store
-Thumbs.db
-
-# 忽略日志文件
-*.log
-
-# 忽略编辑器配置文件（如果有）
+# 环境变量
+.env
+.env.local
+# 日志
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+# 编辑器配置
 .idea/
 .vscode/
 *.swp
 *.swo
-
-# 忽略环境变量文件
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+# 操作系统文件
+.DS_Store
+Thumbs.db
