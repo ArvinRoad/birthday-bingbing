@@ -1,6 +1,5 @@
 <template>
   <div class="page">
-    <!-- 流星雨画布：最底层 -->
     <canvas ref="meteorCanvas" class="meteor-canvas"></canvas>
     
     <section class="poster">
@@ -34,56 +33,49 @@
 import { ref, onMounted, onUnmounted, inject, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 
-// 注入全局音频播放方法
 const playGlobalAudio = inject('playGlobalAudio')
-
-// 路由跳转
 const router = useRouter()
 const goToStar = () => {
   playGlobalAudio()
   router.push('/star')
 }
 
-// ---------------------- 左上→右下线性流星 ----------------------
+const baseUrl = import.meta.env.BASE_URL
+
 const meteorCanvas = ref(null)
 let meteorCtx = null
 let meteorAnimationId = null
 let meteors = []
 let stars = []
 
-// 安全的数值校验函数
 const isValidNumber = (num) => {
   return !isNaN(num) && isFinite(num) && num >= 0
 }
 
-// 柔和紫金色值
 const COLORS = {
-  purple: { r: 145, g: 80, b: 170 },    // 柔和深紫
-  gold: { r: 200, g: 180, b: 80 },      // 柔和金色
-  lightPurple: { r: 210, g: 200, b: 220 }, // 极浅紫
-  lightGold: { r: 230, g: 220, b: 200 }    // 极浅金
+  purple: { r: 145, g: 80, b: 170 },
+  gold: { r: 200, g: 180, b: 80 },
+  lightPurple: { r: 210, g: 200, b: 220 },
+  lightGold: { r: 230, g: 220, b: 200 }
 }
 
-// 左上→右下流星配置
 const METEOR_CONFIG = {
-  meteorCount: 5,  // 少量流星，不遮挡
+  meteorCount: 5,
   starCount: 100,
-  meteorMinSpeed: 1.2, // 线性速度
+  meteorMinSpeed: 1.2,
   meteorMaxSpeed: 2.5,
   meteorMinLength: 60,
   meteorMaxLength: 150,
-  meteorMinWidth: 0.5, // 细线条
+  meteorMinWidth: 0.5,
   meteorMaxWidth: 1.2,
-  trailMinLength: 5,   
+  trailMinLength: 5,
   trailMaxLength: 8
 }
 
-// 静态星光点
 class Star {
   constructor(canvasWidth, canvasHeight) {
     this.reset(canvasWidth, canvasHeight)
   }
-
   reset(canvasWidth, canvasHeight) {
     this.x = isValidNumber(canvasWidth) ? Math.random() * canvasWidth : 0
     this.y = isValidNumber(canvasHeight) ? Math.random() * canvasHeight : 0
@@ -92,7 +84,6 @@ class Star {
     this.blinkSpeed = Math.random() * 0.002 + 0.0003
     this.colorRatio = Math.random()
   }
-
   update() {
     this.opacity += this.blinkSpeed
     if (this.opacity > 0.5) this.opacity = 0.5
@@ -101,14 +92,11 @@ class Star {
       this.blinkSpeed *= -1
     }
   }
-
   draw(ctx) {
     if (!isValidNumber(this.x) || !isValidNumber(this.y) || !isValidNumber(this.size)) return
-    
     const r = Math.round(COLORS.lightPurple.r * (1-this.colorRatio) + COLORS.lightGold.r * this.colorRatio)
     const g = Math.round(COLORS.lightPurple.g * (1-this.colorRatio) + COLORS.lightGold.g * this.colorRatio)
     const b = Math.round(COLORS.lightPurple.b * (1-this.colorRatio) + COLORS.lightGold.b * this.colorRatio)
-    
     ctx.beginPath()
     ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2)
     ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${this.opacity})`
@@ -116,93 +104,66 @@ class Star {
   }
 }
 
-// 流星类：左上→右下线性滑落
 class Meteor {
   constructor(canvasWidth, canvasHeight) {
     this.reset(canvasWidth, canvasHeight)
   }
-
   reset(canvasWidth, canvasHeight) {
     const cw = isValidNumber(canvasWidth) ? canvasWidth : window.innerWidth
     const ch = isValidNumber(canvasHeight) ? canvasHeight : window.innerHeight
-    
-    // 初始位置：左上区域（屏幕内/外）
-    this.x = Math.random() * cw * 0.5 // 0 - 屏幕宽度50%（左上）
-    this.y = Math.random() * ch * 0.3 // 0 - 屏幕高度30%（左上）
-    
-    // 核心修改：左上→右下的线性速度（x正方向，y正方向）
+    this.x = Math.random() * cw * 0.5
+    this.y = Math.random() * ch * 0.3
     const baseSpeed = Math.random() * (METEOR_CONFIG.meteorMaxSpeed - METEOR_CONFIG.meteorMinSpeed) + METEOR_CONFIG.meteorMinSpeed
-    this.speedX = baseSpeed * 0.8 // 向右速度
-    this.speedY = baseSpeed * 0.6 // 向下速度（略慢于向右，形成自然的斜线）
-    
-    // 流星尺寸
+    this.speedX = baseSpeed * 0.8
+    this.speedY = baseSpeed * 0.6
     this.length = Math.max(METEOR_CONFIG.meteorMinLength, Math.random() * (METEOR_CONFIG.meteorMaxLength - METEOR_CONFIG.meteorMinLength) + METEOR_CONFIG.meteorMinLength)
     this.width = Math.max(METEOR_CONFIG.meteorMinWidth, Math.random() * (METEOR_CONFIG.meteorMaxWidth - METEOR_CONFIG.meteorMinWidth) + METEOR_CONFIG.meteorMinWidth)
-    
     this.opacity = Math.random() * 0.6 + 0.2
     this.decay = Math.random() * 0.001 + 0.0003
     this.trailLength = Math.round(Math.random() * (METEOR_CONFIG.trailMaxLength - METEOR_CONFIG.trailMinLength) + METEOR_CONFIG.trailMinLength)
   }
-
   update(canvasWidth, canvasHeight) {
     const cw = isValidNumber(canvasWidth) ? canvasWidth : window.innerWidth
     const ch = isValidNumber(canvasHeight) ? canvasHeight : window.innerHeight
-
-    // 左上→右下线性移动
     if (isValidNumber(this.x) && isValidNumber(this.speedX)) {
-      this.x += this.speedX // 向右移动
+      this.x += this.speedX
     }
     if (isValidNumber(this.y) && isValidNumber(this.speedY)) {
-      this.y += this.speedY // 向下移动
+      this.y += this.speedY
     }
     this.opacity = Math.max(0, this.opacity - this.decay)
-
-    // 重置条件：移出右下屏幕
     if (this.x > cw + this.length || this.y > ch + this.length || this.opacity <= 0) {
       this.reset(cw, ch)
     }
   }
-
   draw(ctx) {
     if (!isValidNumber(this.x) || !isValidNumber(this.y) || !isValidNumber(this.length) || this.opacity <= 0) {
       return
     }
-
     ctx.save()
-    // 线性渐变：流星头部（左上）→ 尾部（右下）
-    const gradX = this.x + this.length * 0.7 // 右下方向的渐变终点
-    const gradY = this.y + this.length * 0.5 // 右下方向的渐变终点
-    
+    const gradX = this.x + this.length * 0.7
+    const gradY = this.y + this.length * 0.5
     if (!isValidNumber(gradX) || !isValidNumber(gradY)) {
       ctx.restore()
       return
     }
-
-    // 柔和的线性渐变（头部亮，尾部暗）
     const gradient = ctx.createLinearGradient(this.x, this.y, gradX, gradY)
-    gradient.addColorStop(0, `rgba(${COLORS.gold.r}, ${COLORS.gold.g}, ${COLORS.gold.b}, ${this.opacity})`) // 头部金色
-    gradient.addColorStop(1, `rgba(${COLORS.purple.r}, ${COLORS.purple.g}, ${COLORS.purple.b}, ${this.opacity * 0.3})`) // 尾部紫色
-    
-    // 绘制线性流星线条
+    gradient.addColorStop(0, `rgba(${COLORS.gold.r}, ${COLORS.gold.g}, ${COLORS.gold.b}, ${this.opacity})`)
+    gradient.addColorStop(1, `rgba(${COLORS.purple.r}, ${COLORS.purple.g}, ${COLORS.purple.b}, ${this.opacity * 0.3})`)
     ctx.beginPath()
     ctx.strokeStyle = gradient
     ctx.lineWidth = this.width
-    ctx.lineCap = 'round' // 圆形端点，避免长条形
-    ctx.moveTo(this.x, this.y) // 起点（左上）
-    ctx.lineTo(gradX, gradY) // 终点（右下）
+    ctx.lineCap = 'round'
+    ctx.moveTo(this.x, this.y)
+    ctx.lineTo(gradX, gradY)
     ctx.stroke()
-
-    // 线性拖尾（右下方向）
     for (let i = 1; i < this.trailLength; i++) {
       const trailOpacity = this.opacity * (1 - i/this.trailLength) * 0.5
       if (trailOpacity <= 0.1) continue
-      
       const trailX = this.x + (gradX - this.x) * (i/this.trailLength)
       const trailY = this.y + (gradY - this.y) * (i/this.trailLength)
       const trailSize = this.width * (1 - i/this.trailLength) * 0.6
-      
       if (!isValidNumber(trailX) || !isValidNumber(trailY) || !isValidNumber(trailSize)) continue
-      
       ctx.beginPath()
       ctx.arc(trailX, trailY, trailSize, 0, Math.PI * 2)
       ctx.fillStyle = `rgba(${COLORS.gold.r}, ${COLORS.gold.g}, ${COLORS.gold.b}, ${trailOpacity})`
@@ -212,47 +173,26 @@ class Meteor {
   }
 }
 
-// 初始化
 const initMeteorCanvas = async () => {
   await nextTick()
-  
-  if (!meteorCanvas.value) {
-    console.error('Canvas元素未找到')
-    return
-  }
-  
+  if (!meteorCanvas.value) return
   try {
-    // 清除旧动画
     if (meteorAnimationId) {
       cancelAnimationFrame(meteorAnimationId)
       meteorAnimationId = null
     }
-    
     meteorCtx = meteorCanvas.value.getContext('2d')
-    if (!meteorCtx) {
-      console.error('无法获取Canvas 2D上下文')
-      return
-    }
-    
-    // 设置画布尺寸
+    if (!meteorCtx) return
     const w = window.innerWidth || 375
     const h = window.innerHeight || 667
     meteorCanvas.value.width = w
     meteorCanvas.value.height = h
-    console.log('画布尺寸设置完成:', w, h)
-    
-    // 初始化粒子
     stars = []
     meteors = []
     initStars()
     initMeteors()
-    console.log('流星数量:', meteors.length, '星光数量:', stars.length)
-    
-    // 启动动画
     animateMeteors()
-  } catch (e) {
-    console.error('流星雨初始化失败:', e)
-  }
+  } catch (e) {}
 }
 
 const initStars = () => {
@@ -269,31 +209,22 @@ const initMeteors = () => {
   }
 }
 
-// 动画渲染
 const animateMeteors = () => {
   if (!meteorCtx) return
-  
   try {
     const { width, height } = meteorCanvas.value
-    // 柔和清屏
     meteorCtx.fillStyle = 'rgba(0, 0, 0, 0.03)'
     meteorCtx.fillRect(0, 0, width, height)
-    
-    // 渲染星光
     stars.forEach(star => {
       star.update()
       star.draw(meteorCtx)
     })
-
-    // 渲染流星
     meteors.forEach(meteor => {
       meteor.update(width, height)
       meteor.draw(meteorCtx)
     })
-
     meteorAnimationId = requestAnimationFrame(animateMeteors)
   } catch (e) {
-    console.error('动画渲染错误:', e)
     setTimeout(() => {
       if (meteorAnimationId) cancelAnimationFrame(meteorAnimationId)
       animateMeteors()
@@ -301,12 +232,10 @@ const animateMeteors = () => {
   }
 }
 
-// 生命周期
 onMounted(() => {
   setTimeout(() => {
     initMeteorCanvas()
   }, 300)
-  
   window.addEventListener('resize', () => {
     if (meteorAnimationId) cancelAnimationFrame(meteorAnimationId)
     setTimeout(initMeteorCanvas, 100)
@@ -330,7 +259,6 @@ onUnmounted(() => {
   background: #0a0812;
 }
 
-/* 画布样式：最底层，无滤镜，低透明度 */
 .meteor-canvas {
   position: fixed;
   top: 0;
@@ -343,12 +271,12 @@ onUnmounted(() => {
   opacity: 0.9;
 }
 
-/* 主海报区域 */
+/* ✅ 这里我帮你彻底修复了！*/
 .poster {
   width: 100vw;
   height: 100vh;
   position: relative;
-  background: url('/images/QunXiang.png') center/cover no-repeat;
+  background: url('/birthday-bingbing/images/QunXiang.png') center/cover no-repeat;
   background-attachment: fixed;
   display: flex;
   align-items: center;
@@ -358,7 +286,6 @@ onUnmounted(() => {
   z-index: 1;
 }
 
-/* 文字内容：增强对比度 */
 .content {
   position: relative;
   z-index: 2;
@@ -405,7 +332,6 @@ onUnmounted(() => {
   font-weight: 500;
 }
 
-/* 留言区域 */
 .message {
   width: 100vw;
   padding: 10vh 5vw;
@@ -450,7 +376,6 @@ onUnmounted(() => {
   color: #f0e6d2;
 }
 
-/* 按钮区域 */
 .end {
   width: 100vw;
   padding: 10vh 5vw;
@@ -487,7 +412,6 @@ onUnmounted(() => {
               inset 0 0 1.5vw rgba(255, 255, 255, 0.5);
 }
 
-/* 小屏适配 */
 @media (max-width: 375px) {
   .poster h1 {
     font-size: 9vw;
