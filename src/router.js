@@ -3,14 +3,14 @@ import Home from './views/Home.vue'
 import Star from './views/Star.vue'
 
 const router = createRouter({
-  history: createWebHistory('/birthday-bingbing/'),
+  history: createWebHistory(import.meta.env.BASE_URL),
+
   routes: [
     { path: '/', name: 'Home', component: Home },
     { path: '/star', name: 'Star', component: Star },
-    // 404路由（可选）
     { path: '/:pathMatch(.*)*', redirect: '/' }
   ],
-  // 手机端路由切换滚动到顶部
+
   scrollBehavior() {
     return { top: 0 }
   }
