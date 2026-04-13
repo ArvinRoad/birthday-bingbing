@@ -3,14 +3,18 @@ import vue from '@vitejs/plugin-vue'
 
 export default defineConfig({
   plugins: [vue()],
-  base: '/birthday-bingbing/', 
-  server: {
-    port: 5173,
-    open: true // 启动时自动打开浏览器
-  },
+  base: '/birthday-bingbing/',
   build: {
-    outDir: 'dist', 
+    // 打包输出目录（默认 dist，无需修改）
+    outDir: 'dist',
+    // 静态资源目录
     assetsDir: 'assets',
-    sourcemap: false
+    rollupOptions: {
+      output: {
+        assetFileNames: 'assets/[name]-[hash][extname]',
+        chunkFileNames: 'assets/[name]-[hash].js',
+        entryFileNames: 'assets/[name]-[hash].js'
+      }
+    }
   }
 })

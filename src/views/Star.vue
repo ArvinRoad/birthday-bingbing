@@ -10,7 +10,10 @@
         愿你岁岁年年，平安喜乐<br>
         所有美好和温柔都如约而至～
       </p>
-      <img src="/birthday-bingbing/images/ZongLi_LiHui.png" class="birthday-img" alt="生日图片" />
+
+      <!-- ✅ 这里我帮你修好了！-->
+      <img :src="`${baseUrl}images/ZongLiLiHui.png`" class="birthday-img" alt="生日图片" />
+
       <p class="birthday-wish">—— 遇见你，是我最珍贵的摩拉 ✨</p>
       <button class="back-btn" @click="goBack">🔙 返回主页</button>
     </div>
@@ -22,12 +25,14 @@ import { ref, onMounted, onUnmounted, inject } from 'vue';
 import { useRouter } from 'vue-router';
 
 const playGlobalAudio = inject('playGlobalAudio')
-
 const router = useRouter();
 const goBack = () => {
   playGlobalAudio()
   router.push('/');
 };
+
+// ✅ 关键修复：在这里定义 baseUrl，模板里直接用
+const baseUrl = import.meta.env.BASE_URL;
 
 const starCanvas = ref(null);
 let ctx = null;
@@ -129,7 +134,6 @@ onUnmounted(() => {
   position: relative;
 }
 
-/* 全局黑金渐变叠加层 */
 .global-gradient {
   position: fixed;
   top: 0;

@@ -348,7 +348,7 @@ onUnmounted(() => {
   width: 100vw;
   height: 100vh;
   position: relative;
-  background: url('/birthday-bingbing/images/QunXiang.png') center/cover no-repeat;
+  background: url('/images/QunXiang.png') center/cover no-repeat;
   background-attachment: fixed;
   display: flex;
   align-items: center;
