@@ -7,14 +7,17 @@
     <div class="birthday-box">
       <h1 class="birthday-title">生日快乐！🎂</h1>
       <p class="birthday-wish">
-        愿你岁岁年年，平安喜乐<br>
-        所有美好和温柔都如约而至～
+        愿新岁平安顺遂，万事皆如所愿<br>
+        岁岁常欢愉，年年皆胜意
       </p>
 
-      <!-- ✅ 这里我帮你修好了！-->
       <img :src="`${baseUrl}images/ZongLiLiHui.png`" class="birthday-img" alt="生日图片" />
 
-      <p class="birthday-wish">—— 遇见你，是我最珍贵的摩拉 ✨</p>
+      <p class="birthday-wish">
+        愿你在提瓦特与现实之间<br>
+        永远自在、从容、被世界温柔以待 ✨
+      </p>
+
       <button class="back-btn" @click="goBack">🔙 返回主页</button>
     </div>
   </div>
@@ -31,7 +34,6 @@ const goBack = () => {
   router.push('/');
 };
 
-// ✅ 关键修复：在这里定义 baseUrl，模板里直接用
 const baseUrl = import.meta.env.BASE_URL;
 
 const starCanvas = ref(null);

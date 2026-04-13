@@ -14,17 +14,19 @@
     <section class="message">
       <div class="card">
         <div class="text">
-          <p>很高兴能认识你。</p>
-          <p>愿你在提瓦特自在如风，</p>
-          <p>在现实里平安、开心、被温柔以待。</p>
-          <p>你对我来说，真的很重要。</p>
-          <p class="sign">宋宇辰 · 2026.04.14</p>
+          <p>见你之时，便是契约订立之日。</p>
+          <p>愿你在提瓦特，有岩王帝君为你护持前路；</p>
+          <p>愿你在现实，有岁岁平安为你常伴左右。</p>
+          <p>摩拉可计数，而遇见你，</p>
+          <p>是我此生最珍贵的「无价之约」。</p>
+          <p>刘冰冰，生日快乐，往后每一岁，都有美好相伴。✨</p>
+          <p class="sign">此间友人敬祝 🌟</p>
         </div>
       </div>
     </section>
 
     <section class="end">
-      <button class="btn" @click="goToStar">✨ 打开星光祝福</button>
+      <button class="btn" @click="goToStar">✨ 星光祝福</button>
     </section>
   </div>
 </template>
@@ -271,7 +273,6 @@ onUnmounted(() => {
   opacity: 0.9;
 }
 
-/* ✅ 这里我帮你彻底修复了！*/
 .poster {
   width: 100vw;
   height: 100vh;
